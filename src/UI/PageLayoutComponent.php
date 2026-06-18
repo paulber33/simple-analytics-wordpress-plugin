@@ -84,14 +84,16 @@ class PageLayoutComponent
                         <?php $currentTab->render(); ?>
                     </div>
 
-                    <div class="mt-6 flex items-center justify-start gap-x-6">
-                        <button
-                            type="submit"
-                            class="rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm bg-primary hover:bg-red-500 focus-visible:outline-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                        >
-                            Save Changes
-                        </button>
-                    </div>
+                    <?php if ($currentTab->getSlug() !== 'general'): ?>
+                        <div class="mt-6 flex items-center justify-start gap-x-6">
+                            <button
+                                type="submit"
+                                class="rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm bg-primary hover:bg-red-500 focus-visible:outline-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                            >
+                                Save Changes
+                            </button>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </form>
             <script>
@@ -177,7 +179,7 @@ class PageLayoutComponent
                 </a>.
                 The trial includes almost all features, then you can choose a free or paid plan.
             </p>
-            <p class="mt-5">
+            <p class="mt-6">
                 <a
                     href="<?php echo htmlspecialchars(self::DASHBOARD_URL, ENT_QUOTES, 'UTF-8'); ?>"
                     target="_blank"
