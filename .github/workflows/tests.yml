@@ -37,6 +37,8 @@ jobs:
         name: WP ${{ matrix.wp }} / PHP ${{ matrix.php }}
         runs-on: ubuntu-24.04
         timeout-minutes: 20
+        env:
+            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
         strategy:
             fail-fast: false
             matrix: ${{ fromJSON(needs.prepare-matrix.outputs.matrix) }}
@@ -61,17 +63,14 @@ jobs:
             - name: Install pnpm dependencies
               run: pnpm install
 
-            - name: Cache wp-env
-              uses: actions/cache@v5
-              with:
-                  path: ~/.wp-env
-                  key: ${{ runner.os }}-wp-env-${{ matrix.wp }}-${{ matrix.php }}-${{ hashFiles('.wp-env.json') }}
-
-            - name: Cache Playwright browsers
-              uses: actions/cache@v5
+            - name: Restore Playwright browsers cache
+              id: playwright-cache
+              uses: actions/cache/restore@v5
               with:
                   path: ~/.cache/ms-playwright
                   key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+                  restore-keys: |
+                      ${{ runner.os }}-playwright-
 
             - name: Set WordPress and PHP version override
               run: |
@@ -83,8 +82,39 @@ jobs:
             - name: Start wp-env
               run: pnpm exec wp-env start
 
-            - name: Install Playwright browsers
-              run: pnpm run tests:install
+            - name: Verify WordPress login page
+              run: |
+                  for attempt in {1..10}; do
+                    if curl -fsS http://localhost:8888/wp-login.php | grep -q 'id="user_login"'; then
+                      exit 0
+                    fi
+                    sleep 3
+                  done
+
+                  curl -fsS http://localhost:8888/wp-login.php || true
+                  exit 1
+
+            - name: Use Ubuntu archive mirror
+              run: |
+                  if [ -f /etc/apt/apt-mirrors.txt ]; then
+                    sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
+                  fi
+                  if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+                    sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources
+                  fi
+                  sudo apt-get update
+
+            - name: Install Playwright
+              timeout-minutes: 5
+              run: pnpm exec playwright install --with-deps chromium
+
+            - name: Save Playwright browsers cache
+              if: steps.playwright-cache.outputs.cache-hit != 'true'
+              uses: actions/cache/save@v5
+              continue-on-error: true
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
 
             - name: Run Playwright tests
               run: pnpm exec playwright test
